@@ -1,16 +1,14 @@
-# app.py
 import streamlit as st
 import pandas as pd
-import numpy as np
 import joblib
 
 st.set_page_config(
-    page_title="Medical Insurance Cost Predictor",
-    page_icon="🏥",
+    page_title="Indian Medical Insurance Premium Predictor",
+    page_icon="🇮🇳",
     layout="centered"
 )
 
-# Load saved artifacts using joblib
+# Load artifacts
 @st.cache_resource
 def load_assets():
     model = joblib.load('insurance_model.pkl')
@@ -20,60 +18,48 @@ def load_assets():
 
 try:
     model, scaler, feature_columns = load_assets()
-except Exception as e:
-    st.error("Model artifacts not found. Please ensure 'insurance_model.pkl', 'scaler.pkl', and 'columns.pkl' are in your repository.")
+except Exception:
+    st.error("Model files not found! Ensure insurance_model.pkl, scaler.pkl, and columns.pkl are uploaded.")
     st.stop()
 
-# Title and UI Description
-st.title("🏥 Medical Insurance Cost Predictor")
-st.markdown("Enter patient demographic and health information to predict estimated annual medical insurance charges.")
+st.title("🇮🇳 Indian Medical Insurance Premium Predictor")
+st.markdown("Predict estimated annual health insurance premiums based on Indian health and demographic indicators.")
 st.write("---")
 
-# User Input Form
 col1, col2 = st.columns(2)
 
 with col1:
-    age = st.slider("Age", min_value=18, max_value=100, value=30, step=1)
-    bmi = st.number_input("Body Mass Index (BMI)", min_value=10.0, max_value=60.0, value=25.0, step=0.1)
-    children = st.selectbox("Number of Dependents / Children", options=[0, 1, 2, 3, 4, 5], index=0)
+    age = st.slider("Age (Years)", 18, 85, 30)
+    height = st.number_input("Height (cm)", min_value=120, max_value=220, value=170)
+    weight = st.number_input("Weight (kg)", min_value=30, max_value=160, value=70)
+    surgeries = st.selectbox("Number of Major Surgeries", [0, 1, 2, 3])
+    transplants = st.selectbox("Any Organ Transplants?", ["No", "Yes"])
 
 with col2:
-    sex = st.selectbox("Sex", options=["Female", "Male"])
-    smoker = st.selectbox("Smoker Status", options=["No", "Yes"])
-    region = st.selectbox("US Region", options=["Northeast", "Northwest", "Southeast", "Southwest"])
+    diabetes = st.selectbox("Diabetes History?", ["No", "Yes"])
+    bp = st.selectbox("Blood Pressure Issues?", ["No", "Yes"])
+    chronic = st.selectbox("Any Chronic Diseases?", ["No", "Yes"])
+    allergies = st.selectbox("Known Allergies?", ["No", "Yes"])
+    cancer_history = st.selectbox("Family History of Cancer?", ["No", "Yes"])
 
 st.write("")
 
-# Prediction Trigger
-if st.button("Calculate Predicted Charges", type="primary", use_container_width=True):
-    # Construct feature mapping matching training schema
+if st.button("Calculate Annual Premium (INR)", type="primary", use_container_width=True):
     input_data = {
-        'age': age,
-        'bmi': bmi,
-        'children': children,
-        'sex_male': 1 if sex == "Male" else 0,
-        'smoker_yes': 1 if smoker == "Yes" else 0,
-        'region_northwest': 1 if region == "Northwest" else 0,
-        'region_southeast': 1 if region == "Southeast" else 0,
-        'region_southwest': 1 if region == "Southwest" else 0,
+        'Age': age,
+        'Diabetes': 1 if diabetes == "Yes" else 0,
+        'BloodPressureProblems': 1 if bp == "Yes" else 0,
+        'AnyTransplants': 1 if transplants == "Yes" else 0,
+        'AnyChronicDiseases': 1 if chronic == "Yes" else 0,
+        'Height': height,
+        'Weight': weight,
+        'KnownAllergies': 1 if allergies == "Yes" else 0,
+        'HistoryOfCancerInFamily': 1 if cancer_history == "Yes" else 0,
+        'NumberOfMajorSurgeries': surgeries
     }
     
-    # Format into DataFrame with correct column ordering
     input_df = pd.DataFrame([input_data])[feature_columns]
+    scaled_input = scaler.transform(input_df)
+    predicted_premium = max(0.0, float(model.predict(scaled_input)[0]))
     
-    # Scale inputs
-    scaled_features = scaler.transform(input_df)
-    
-    # Predict using Scikit-Learn MLP model
-    prediction = model.predict(scaled_features)[0]
-    final_cost = max(0.0, float(prediction))
-    
-    st.success(f"### Estimated Annual Charge: **${final_cost:,.2f}**")
-    
-    if smoker == "Yes":
-        st.warning("⚠️ Smoking status significantly impacts overall medical insurance projections.")
-    st.success(f"### Estimated Annual Charge: **${final_cost:,.2f}**")
-    
-    # Contextual Callout
-    if smoker == "Yes":
-        st.warning("⚠️ Smoking status significantly increases the projected cost risk.")
+    st.success(f"### Estimated Yearly Premium: **₹{predicted_premium:,.2f}**")
